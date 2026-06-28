@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DroneCast Web</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        breeze: { bg: '#232629', surface: '#31363b', text: '#eff0f1', border: '#4d5057', accent: '#3daee9', green: '#27ae60', red: '#da4453' }
+                    }
+                }
+            }
+        }
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; background: #232629; color: #eff0f1; }
+        ::-webkit-scrollbar { height: 8px; width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #4d5057; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3daee9; }
+        * { scrollbar-width: thin; scrollbar-color: #4d5057 transparent; }
+        .matrix-table th, .matrix-table td { min-width: 60px; padding: 0.5rem; border: 1px solid #4d5057; white-space: nowrap; text-align: center; }
+        .sticky-col { position: sticky; left: 0; z-index: 10; border-right: 2px solid #4d5057; }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 1rem); }
+    </style>
+</head>
+<body class="min-h-screen pb-20">
+
+    <!-- Header -->
+    <header class="w-full bg-breeze-surface p-4 pt-6 flex flex-col gap-4 shadow-md border-b border-breeze-border max-w-md mx-auto">
+        <h1 class="text-xl font-bold flex items-center justify-center gap-2 text-breeze-accent"><i data-lucide="plane"></i> DroneCast</h1>
+        
+        <div id="location-bar" class="flex gap-2">
+            <div class="flex-1 flex bg-breeze-bg rounded-lg overflow-hidden border border-breeze-border focus-within:border-breeze-accent">
+                <button id="btn-search" class="p-3 text-gray-400 hover:text-breeze-text"><i data-lucide="search" class="w-4 h-4"></i></button>
+                <input type="text" id="input-city" placeholder="Search location..." class="w-full bg-transparent py-3 pr-3 outline-none text-breeze-text placeholder-gray-500 text-sm">
+            </div>
+            <button id="btn-gps" class="p-3 bg-breeze-bg text-gray-400 rounded-lg border border-breeze-border hover:text-breeze-accent"><i data-lucide="crosshair" class="w-5 h-5"></i></button>
+        </div>
+        <div id="location-label" class="text-center text-gray-400 text-xs font-medium truncate">Location not set</div>
+        <div id="day-tabs" class="flex gap-2 overflow-x-auto mt-1"></div>
+    </header>
+
+    <!-- Forecast View -->
+    <div class="w-full max-w-md mx-auto p-4 flex flex-col gap-4" id="view-forecast">
+        <div id="status-banner" class="w-full p-4 rounded-xl text-center border bg-breeze-surface">
+            <h2 id="status-title" class="text-xl font-bold mb-1">STANDBY</h2>
+            <p id="status-message" class="text-xs opacity-90">Enter location to calculate.</p>
+        </div>
+
+        <div class="w-full bg-breeze-surface rounded-xl border border-breeze-border overflow-hidden text-sm shadow-sm">
+            <div class="bg-[#2a2e32] px-4 py-2 font-bold text-gray-300 border-b border-breeze-border">Wind</div>
+            <div class="px-4 py-3 flex justify-between border-b border-breeze-border items-center">
+                <span class="flex items-center gap-2 text-gray-400"><i data-lucide="wind" class="w-4 h-4"></i> Speed</span>
+                <span id="val-wind" class="font-semibold">--</span>
+            </div>
+            <div class="px-4 py-3 flex justify-between border-b border-breeze-border items-center">
+                <span class="flex items-center gap-2 text-gray-400"><i data-lucide="fast-forward" class="w-4 h-4"></i> Gusts</span>
+                <span id="val-gust" class="font-semibold">--</span>
+            </div>
+            <div class="px-4 py-3 flex justify-between border-b border-breeze-border items-center">
+                <span class="flex items-center gap-2 text-gray-400"><i data-lucide="compass" class="w-4 h-4"></i> Direction</span>
+                <span id="val-dir" class="font-semibold text-breeze-text">--</span>
+            </div>
+
+            <div class="bg-[#2a2e32] px-4 py-2 font-bold text-gray-300 border-b border-breeze-border border-t">Conditions</div>
+            <div class="px-4 py-3 flex justify-between border-b border-breeze-border items-center">
+                <span class="flex items-center gap-2 text-gray-400"><i data-lucide="thermometer" class="w-4 h-4"></i> Temp</span>
+                <span id="val-temp" class="font-semibold">--</span>
+            </div>
+            <div class="px-4 py-3 flex justify-between border-b border-breeze-border items-center">
+                <span class="flex items-center gap-2 text-gray-400"><i data-lucide="umbrella" class="w-4 h-4"></i> Rain Prob.</span>
+                <span id="val-rain" class="font-semibold">--</span>
+            </div>
+            <div class="px-4 py-3 flex justify-between border-b border-breeze-border items-center">
+                <span class="flex items-center gap-2 text-gray-400"><i data-lucide="satellite" class="w-4 h-4"></i> Kp Index</span>
+                <span id="val-kp" class="font-semibold">--</span>
+            </div>
+
+            <div class="bg-[#2a2e32] px-4 py-2 font-bold text-gray-300 border-b border-breeze-border border-t">Visibility</div>
+            <div class="px-4 py-3 flex justify-between border-b border-breeze-border items-center">
+                <span class="flex items-center gap-2 text-gray-400"><i data-lucide="eye" class="w-4 h-4"></i> Distance</span>
+                <span id="val-vis" class="font-semibold">--</span>
+            </div>
+            <div class="px-4 py-3 flex justify-between border-b border-breeze-border items-center">
+                <span class="flex items-center gap-2 text-gray-400"><i data-lucide="cloud" class="w-4 h-4"></i> Cloud Cover</span>
+                <span id="val-cloud" class="font-semibold text-breeze-text">--</span>
+            </div>
+            <div class="px-4 py-3 flex justify-between border-b border-breeze-border items-center">
+                <span class="flex items-center gap-2 text-gray-400"><i data-lucide="sunrise" class="w-4 h-4"></i> Sunrise</span>
+                <span id="val-sunrise" class="font-semibold text-breeze-text">--</span>
+            </div>
+            <div class="px-4 py-3 flex justify-between border-b border-breeze-border items-center">
+                <span class="flex items-center gap-2 text-gray-400"><i data-lucide="sunset" class="w-4 h-4"></i> Sunset</span>
+                <span id="val-sunset" class="font-semibold text-breeze-text">--</span>
+            </div>
+        </div>
+
+        <div class="w-full bg-breeze-surface rounded-xl border border-breeze-border overflow-hidden shadow-sm">
+            <div class="bg-[#2a2e32] px-4 py-3 font-bold text-gray-300 border-b border-breeze-border">Hourly Progress</div>
+            <div class="w-full overflow-x-auto"><table class="w-max min-w-full matrix-table text-xs bg-breeze-surface" id="hourly-matrix"></table></div>
+        </div>
+    </div>
+
+    <!-- Settings View -->
+    <div class="w-full max-w-md mx-auto p-4 flex-col gap-4 hidden" id="view-settings">
+        <h2 class="text-xl font-bold flex items-center gap-2 text-breeze-text mb-4"><i data-lucide="sliders"></i> Flight Thresholds</h2>
+        <div class="bg-breeze-surface rounded-xl border border-breeze-border p-5 space-y-5">
+            <div>
+                <label class="block text-sm font-semibold text-gray-300 mb-2">Drone Preset</label>
+                <select id="preset-select" class="w-full bg-breeze-bg border border-breeze-border rounded-lg p-3 outline-none focus:border-breeze-accent text-breeze-text"></select>
+            </div>
+            <div class="space-y-4 pt-4 border-t border-breeze-border">
+                <div><label class="block text-sm text-gray-400 mb-1">Max Wind Speed (km/h)</label><input type="number" id="th-wind" class="w-full bg-breeze-bg border border-breeze-border rounded-lg p-3 outline-none focus:border-breeze-accent text-breeze-text"></div>
+                <div><label class="block text-sm text-gray-400 mb-1">Max Gust Speed (km/h)</label><input type="number" id="th-gust" class="w-full bg-breeze-bg border border-breeze-border rounded-lg p-3 outline-none focus:border-breeze-accent text-breeze-text"></div>
+                <div><label class="block text-sm text-gray-400 mb-1">Max Kp Index (0-9)</label><input type="number" id="th-kp" class="w-full bg-breeze-bg border border-breeze-border rounded-lg p-3 outline-none focus:border-breeze-accent text-breeze-text"></div>
+                <div><label class="block text-sm text-gray-400 mb-1">Min Visibility (km)</label><input type="number" id="th-vis" class="w-full bg-breeze-bg border border-breeze-border rounded-lg p-3 outline-none focus:border-breeze-accent text-breeze-text"></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-sm text-gray-400 mb-1">Min Temp (°C)</label><input type="number" id="th-mintemp" class="w-full bg-breeze-bg border border-breeze-border rounded-lg p-3 outline-none focus:border-breeze-accent text-breeze-text"></div>
+                    <div><label class="block text-sm text-gray-400 mb-1">Max Temp (°C)</label><input type="number" id="th-maxtemp" class="w-full bg-breeze-bg border border-breeze-border rounded-lg p-3 outline-none focus:border-breeze-accent text-breeze-text"></div>
+                </div>
+            </div>
+            <button id="btn-save-settings" class="w-full mt-4 bg-breeze-green text-white font-bold py-3 rounded-xl transition shadow-md">Save Configuration</button>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation (Forecast + Settings only) -->
+    <nav class="fixed bottom-0 w-full max-w-md bg-breeze-surface border-t border-breeze-border pb-safe z-50 flex justify-around p-2" style="left:50%;transform:translateX(-50%)">
+        <button class="nav-tab flex flex-col items-center gap-1 w-full py-2 text-breeze-accent" data-target="view-forecast">
+            <i data-lucide="cloud-sun" class="w-6 h-6"></i>
+            <span class="text-[10px] font-semibold">Forecast</span>
+        </button>
+        <button class="nav-tab flex flex-col items-center gap-1 w-full py-2 text-gray-500 hover:text-gray-300" data-target="view-settings">
+            <i data-lucide="settings" class="w-6 h-6"></i>
+            <span class="text-[10px] font-semibold">Settings</span>
+        </button>
+    </nav>
+
+    <script>
+        const PRESETS = {
+            'custom': { name: 'Custom Drone', wind: 35, gust: 45, kp: 5, vis: 5, minTemp: 0, maxTemp: 40 },
+            'dji-neo': { name: 'DJI Neo', wind: 28, gust: 35, kp: 5, vis: 5, minTemp: -10, maxTemp: 40 },
+            'dji-neo-2': { name: 'DJI Neo 2', wind: 35, gust: 40, kp: 5, vis: 5, minTemp: -10, maxTemp: 40 },
+            'dji-avata-2': { name: 'DJI Avata 2', wind: 38, gust: 45, kp: 5, vis: 5, minTemp: -10, maxTemp: 40 },
+            'dji-mini-2': { name: 'DJI Mini 2 / SE', wind: 38, gust: 45, kp: 5, vis: 5, minTemp: 0, maxTemp: 40 },
+            'dji-mini-3': { name: 'DJI Mini 3/4 Pro', wind: 38, gust: 45, kp: 5, vis: 5, minTemp: -10, maxTemp: 40 },
+            'dji-mini-4k': { name: 'DJI Mini 4K', wind: 38, gust: 45, kp: 5, vis: 5, minTemp: 0, maxTemp: 40 },
+            'dji-air-2s': { name: 'DJI Air 2S', wind: 38, gust: 45, kp: 5, vis: 5, minTemp: 0, maxTemp: 40 },
+            'dji-air-3': { name: 'DJI Air 3', wind: 43, gust: 50, kp: 5, vis: 5, minTemp: -10, maxTemp: 40 },
+            'dji-mavic-3': { name: 'DJI Mavic 3 / Pro', wind: 43, gust: 50, kp: 5, vis: 5, minTemp: -10, maxTemp: 40 },
+            'dji-inspire-3': { name: 'DJI Inspire 3', wind: 50, gust: 60, kp: 5, vis: 5, minTemp: -20, maxTemp: 40 },
+            'autel-nano': { name: 'Autel EVO Nano+', wind: 38, gust: 45, kp: 5, vis: 5, minTemp: 0, maxTemp: 40 },
+            'fimi-x8': { name: 'FIMI X8 SE', wind: 50, gust: 60, kp: 5, vis: 5, minTemp: 0, maxTemp: 40 }
+        };
+
+        let activeSettings = JSON.parse(localStorage.getItem('dronecast-settings')) || { presetId: 'dji-mini-3', ...PRESETS['dji-mini-3'] };
+        let activeLocation = JSON.parse(localStorage.getItem('dronecast-location')) || null;
+        let lastWeatherData = null;
+        let lastKpData = 0;
+        let selectedDayIndex = 0;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            populatePresets();
+            loadSettingsIntoForm();
+
+            document.querySelectorAll('.nav-tab').forEach(btn => btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.nav-tab').forEach(t => { t.classList.remove('text-breeze-accent'); t.classList.add('text-gray-500'); });
+                e.currentTarget.classList.remove('text-gray-500'); e.currentTarget.classList.add('text-breeze-accent');
+                ['view-forecast','view-settings'].forEach(id => document.getElementById(id).style.display = id === e.currentTarget.dataset.target ? 'block' : 'none');
+            }));
+
+            document.getElementById('btn-gps').addEventListener('click', requestGPS);
+            document.getElementById('btn-search').addEventListener('click', () => searchCity(document.getElementById('input-city').value));
+            document.getElementById('input-city').addEventListener('keypress', (e) => { if(e.key === 'Enter') searchCity(e.target.value); });
+            document.getElementById('preset-select').addEventListener('change', handlePresetChange);
+            document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
+            ['th-wind','th-gust','th-kp','th-vis','th-mintemp','th-maxtemp'].forEach(id => document.getElementById(id).addEventListener('input', () => document.getElementById('preset-select').value = 'custom'));
+
+            if (activeLocation) fetchAllData(activeLocation.lat, activeLocation.lon, activeLocation.name);
+        });
+
+        function populatePresets() { document.getElementById('preset-select').innerHTML = Object.entries(PRESETS).map(([id,p]) => `<option value="${id}">${p.name}</option>`).join(''); }
+        function handlePresetChange(e) {
+            if (e.target.value === 'custom') return;
+            const p = PRESETS[e.target.value];
+            ['wind','gust','kp','vis','minTemp','maxTemp'].forEach((k,i) => document.getElementById(['th-wind','th-gust','th-kp','th-vis','th-mintemp','th-maxtemp'][i]).value = p[k]);
+        }
+        function loadSettingsIntoForm() {
+            document.getElementById('preset-select').value = activeSettings.presetId || 'dji-mini-3';
+            document.getElementById('th-wind').value = activeSettings.wind;
+            document.getElementById('th-gust').value = activeSettings.gust;
+            document.getElementById('th-kp').value = activeSettings.kp;
+            document.getElementById('th-vis').value = activeSettings.vis;
+            document.getElementById('th-mintemp').value = activeSettings.minTemp;
+            document.getElementById('th-maxtemp').value = activeSettings.maxTemp;
+        }
+        function saveSettings() {
+            activeSettings = {
+                presetId: document.getElementById('preset-select').value,
+                wind: +document.getElementById('th-wind').value,
+                gust: +document.getElementById('th-gust').value,
+                kp: +document.getElementById('th-kp').value,
+                vis: +document.getElementById('th-vis').value,
+                minTemp: +document.getElementById('th-mintemp').value,
+                maxTemp: +document.getElementById('th-maxtemp').value
+            };
+            localStorage.setItem('dronecast-settings', JSON.stringify(activeSettings));
+            document.querySelector('.nav-tab[data-target="view-forecast"]').click();
+            if (lastWeatherData) renderDashboard();
+        }
+
+        async function requestGPS() {
+            const btn = document.getElementById('btn-gps');
+            btn.innerHTML = '<i data-lucide="loader" class="w-5 h-5 animate-spin"></i>'; lucide.createIcons();
+            navigator.geolocation.getCurrentPosition(
+                async pos => {
+                    const {latitude:lat, longitude:lon} = pos.coords;
+                    let locName = "Current Location";
+                    try {
+                        const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                        const data = await res.json();
+                        if (data?.address) locName = `${data.address.road ? data.address.road+', ' : ''}${data.address.city||data.address.town||data.address.village||data.address.suburb||''}`;
+                    } catch(e) {}
+                    fetchAllData(lat, lon, locName);
+                    btn.innerHTML = '<i data-lucide="crosshair" class="w-5 h-5"></i>'; lucide.createIcons();
+                },
+                () => { alert('GPS access denied.'); btn.innerHTML = '<i data-lucide="crosshair" class="w-5 h-5"></i>'; lucide.createIcons(); },
+                { timeout: 10000 }
+            );
+        }
+
+        async function searchCity(query) {
+            if (!query.trim()) return;
+            document.getElementById('btn-search').innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i>'; lucide.createIcons();
+            try {
+                const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`);
+                const data = await res.json();
+                if (data.results?.length > 0) fetchAllData(data.results[0].latitude, data.results[0].longitude, `${data.results[0].name}, ${data.results[0].country_code}`);
+                else alert('City not found.');
+            } catch(e) { alert('Search error.'); }
+            document.getElementById('btn-search').innerHTML = '<i data-lucide="search" class="w-4 h-4"></i>'; lucide.createIcons();
+        }
+
+        async function fetchAllData(lat, lon, name) {
+            document.getElementById('location-label').innerText = 'Loading...';
+            activeLocation = { lat, lon, name };
+            localStorage.setItem('dronecast-location', JSON.stringify(activeLocation));
+            
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m,visibility,precipitation&hourly=temperature_2m,precipitation_probability,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m,visibility,cloud_cover&daily=temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max,weather_code&timezone=auto&wind_speed_unit=kmh`;
+            
+            try {
+                const [om, noaa] = await Promise.all([
+                    fetch(url).then(r => r.json()),
+                    fetch('https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json').then(r => r.json()).catch(() => null)
+                ]);
+                lastWeatherData = om;
+                lastKpData = (noaa && noaa.length > 1) ? (+noaa[noaa.length-1][1] || 0) : 0;
+                document.getElementById('location-label').innerText = name;
+                selectedDayIndex = 0;
+                renderDashboard();
+            } catch(e) { document.getElementById('location-label').innerText = 'Error fetching data.'; }
+        }
+
+        function getWindDir(deg) {
+            const arrows = ['↓','↙','←','↖','↑','↗','→','↘'];
+            const labels = ['S','SW','W','NW','N','NE','E','SE'];
+            const i = Math.round(deg/45)%8;
+            return arrows[i] + ' ' + labels[i];
+        }
+        function evaluate(w,g,t,kp,v,r) {
+            const p = activeSettings;
+            let safe = true, reasons = [];
+            if (r > 0) { reasons.push('Rain'); safe = false; }
+            if (w > p.wind) { reasons.push('Wind'); safe = false; }
+            if (g > p.gust) { reasons.push('Gusts'); safe = false; }
+            if (t < p.minTemp || t > p.maxTemp) { reasons.push('Temp'); safe = false; }
+            if (kp > p.kp) { reasons.push('Kp Index'); safe = false; }
+            if (v < p.vis) { reasons.push('Vis'); safe = false; }
+            return { safe, reasons: reasons.join(', ') || 'Good' };
+        }
+        function gc(v,limit,min=false) { return ((min ? v < limit : v > limit) ? 'text-breeze-red' : 'text-breeze-green'); }
+        function gtc(v) { return (v < activeSettings.minTemp || v > activeSettings.maxTemp) ? 'text-breeze-red' : 'text-breeze-green'; }
+
+        function renderDashboard() {
+            if (!lastWeatherData) return;
+            
+            let tabs = '';
+            for (let i=0;i<7;i++) {
+                const d = new Date(); d.setDate(d.getDate()+i);
+                const name = i===0?'Today':i===1?'Tmrw':d.toLocaleDateString('en-US',{weekday:'short'});
+                const cls = i===selectedDayIndex ? 'bg-breeze-accent text-white border-breeze-accent' : 'bg-breeze-surface text-gray-400 border-breeze-border';
+                tabs += `<button onclick="selectedDayIndex=${i};renderDashboard()" class="px-4 py-2 text-sm font-semibold rounded-full border whitespace-nowrap transition ${cls}">${name}</button>`;
+            }
+            document.getElementById('day-tabs').innerHTML = tabs;
+
+            let w,g,dir,t,r,v,c,sr,ss;
+            const d = lastWeatherData.daily;
+            
+            if (selectedDayIndex === 0) {
+                const cur = lastWeatherData.current;
+                w=cur.wind_speed_10m; g=cur.wind_gusts_10m; dir=getWindDir(cur.wind_direction_10m);
+                t=cur.temperature_2m; r=cur.precipitation>0?100:0; v=(cur.visibility/1000); c=cur.cloud_cover;
+            } else {
+                w=d.wind_speed_10m_max[selectedDayIndex]; g=d.wind_gusts_10m_max[selectedDayIndex]; dir='-';
+                t=d.temperature_2m_max[selectedDayIndex]; r=d.precipitation_probability_max[selectedDayIndex]; v=-1; c=-1;
+            }
+            sr=new Date(d.sunrise[selectedDayIndex]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+            ss=new Date(d.sunset[selectedDayIndex]).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+
+            const ev = evaluate(w,g,t,lastKpData,v<0?999:v,r);
+            const b = document.getElementById('status-banner');
+            b.className = `w-full p-4 rounded-xl text-center border transition-colors ${ev.safe ? 'bg-breeze-green/20 border-breeze-green text-breeze-green' : 'bg-breeze-red/20 border-breeze-red text-breeze-red'}`;
+            document.getElementById('status-title').innerText = ev.safe ? 'Safe to Fly' : 'Do Not Fly';
+            document.getElementById('status-message').innerText = ev.safe ? 'Conditions met.' : ev.reasons;
+
+            const el = (id, val, cls, unit='') => { const e=document.getElementById(id); e.innerText=val+unit; e.className=`font-bold ${cls}`; };
+            el('val-wind', w, gc(w,activeSettings.wind), ' km/h');
+            el('val-gust', g, gc(g,activeSettings.gust), ' km/h');
+            el('val-dir', dir, 'text-breeze-text');
+            el('val-temp', t, gtc(t), ' °C');
+            el('val-rain', r, gc(r,0), ' %');
+            el('val-kp', lastKpData.toFixed(1), gc(lastKpData,activeSettings.kp));
+            if (selectedDayIndex===0) {
+                el('val-vis', v.toFixed(1), gc(v,activeSettings.vis,true), ' km');
+                el('val-cloud', c, 'text-breeze-text', ' %');
+            } else {
+                el('val-vis', 'N/A', 'text-gray-500');
+                el('val-cloud', 'N/A', 'text-gray-500');
+            }
+            document.getElementById('val-sunrise').innerText = sr;
+            document.getElementById('val-sunset').innerText = ss;
+
+            const h = lastWeatherData.hourly;
+            const sod = new Date(); sod.setDate(sod.getDate()+selectedDayIndex); sod.setHours(0,0,0,0);
+            let si = 0; const now = new Date();
+            for (let i=0;i<h.time.length;i++) {
+                const t2=new Date(h.time[i]);
+                if (selectedDayIndex===0 && t2>=now) { si=i; break; }
+                else if (selectedDayIndex>0 && t2>=sod) { si=i+8; break; }
+            }
+
+            let rTime='<tr><th class="sticky-col bg-breeze-surface"><i data-lucide="clock" class="w-4 h-4 mx-auto text-gray-400"></i></th>';
+            let rFly='<tr><th class="sticky-col bg-breeze-surface text-xs text-gray-400 font-semibold">Fly</th>';
+            let rWind='<tr><th class="sticky-col bg-breeze-surface"><i data-lucide="wind" class="w-4 h-4 mx-auto text-gray-400"></i></th>';
+            let rGust='<tr><th class="sticky-col bg-breeze-surface"><i data-lucide="fast-forward" class="w-4 h-4 mx-auto text-gray-400"></i></th>';
+            let rDir='<tr><th class="sticky-col bg-breeze-surface"><i data-lucide="compass" class="w-4 h-4 mx-auto text-gray-400"></i></th>';
+            let rTemp='<tr><th class="sticky-col bg-breeze-surface"><i data-lucide="thermometer" class="w-4 h-4 mx-auto text-gray-400"></i></th>';
+            let rRain='<tr><th class="sticky-col bg-breeze-surface"><i data-lucide="umbrella" class="w-4 h-4 mx-auto text-gray-400"></i></th>';
+
+            for (let i=si;i<Math.min(si+12,h.time.length);i++) {
+                const ht=new Date(h.time[i]).getHours()+'h';
+                const hw=h.wind_speed_10m[i]; const hg=h.wind_gusts_10m[i]; const hdir=getWindDir(h.wind_direction_10m[i]);
+                const ht2=h.temperature_2m[i]; const hr=h.precipitation_probability[i]; const hv=h.visibility[i]/1000;
+                const s=evaluate(hw,hg,ht2,lastKpData,hv,hr).safe;
+                rTime+=`<th class="bg-[#2a2e32] text-breeze-text">${ht}</th>`;
+                rFly+=`<td class="font-bold ${s?'text-breeze-green':'text-breeze-red'}">${s?'Good':'Bad'}</td>`;
+                rWind+=`<td class="font-bold ${gc(hw,activeSettings.wind)}">${hw}</td>`;
+                rGust+=`<td class="font-bold ${gc(hg,activeSettings.gust)}">${hg}</td>`;
+                rDir+=`<td class="text-gray-400">${hdir}</td>`;
+                rTemp+=`<td class="font-bold ${gtc(ht2)}">${ht2}</td>`;
+                rRain+=`<td class="font-bold ${gc(hr,0)}">${hr}%</td>`;
+            }
+            document.getElementById('hourly-matrix').innerHTML = `<thead>${rTime}</tr></thead><tbody>${rFly}</tr>${rWind}</tr>${rGust}</tr>${rDir}</tr>${rTemp}</tr>${rRain}</tr></tbody>`;
+            lucide.createIcons();
+        }
+    </script>
+</body>
+</html>
