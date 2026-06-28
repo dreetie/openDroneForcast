@@ -293,9 +293,9 @@
 
         function getWindDir(deg) {
             const arrows = ['↓','↙','←','↖','↑','↗','→','↘'];
-            const labels = ['S','SW','W','NW','N','NE','E','SE'];
+            const labels = ['N','NE','E','SE','S','SW','W','NW'];
             const i = Math.round(deg/45)%8;
-            return arrows[i] + ' ' + labels[i];
+            return labels[i] + ' ' + arrows[i];
         }
         function evaluate(w,g,t,kp,v,r) {
             const p = activeSettings;
