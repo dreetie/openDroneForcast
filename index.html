@@ -129,11 +129,26 @@
         </div>
     </div>
 
-    <!-- Bottom Navigation (Forecast + Settings only) -->
+    <!-- Map View -->
+    <div class="w-full max-w-md mx-auto p-4 flex-col gap-3 hidden" id="view-map">
+        <h2 class="text-xl font-bold flex items-center gap-2 text-breeze-text"><i data-lucide="map"></i> Weather Map</h2>
+        <div id="map-layer-bar" class="flex gap-1 overflow-x-auto pb-1"></div>
+        <div class="rounded-xl overflow-hidden border border-breeze-border bg-breeze-bg relative">
+            <div id="map-placeholder" class="absolute inset-0 flex items-center justify-center text-gray-500 text-sm z-10">Search a location first</div>
+            <iframe id="map-iframe" class="w-full h-[65vh]" loading="lazy" allow="fullscreen" referrerpolicy="origin"></iframe>
+        </div>
+        <p class="text-center text-[10px] text-gray-500">Powered by <a href="https://www.ventusky.com/" target="_blank" class="text-breeze-accent underline">Ventusky</a></p>
+    </div>
+
+    <!-- Bottom Navigation -->
     <nav class="fixed bottom-0 w-full max-w-md bg-breeze-surface border-t border-breeze-border pb-safe z-50 flex justify-around p-2" style="left:50%;transform:translateX(-50%)">
         <button class="nav-tab flex flex-col items-center gap-1 w-full py-2 text-breeze-accent" data-target="view-forecast">
             <i data-lucide="cloud-sun" class="w-6 h-6"></i>
             <span class="text-[10px] font-semibold">Forecast</span>
+        </button>
+        <button class="nav-tab flex flex-col items-center gap-1 w-full py-2 text-gray-500 hover:text-gray-300" data-target="view-map">
+            <i data-lucide="map" class="w-6 h-6"></i>
+            <span class="text-[10px] font-semibold">Map</span>
         </button>
         <button class="nav-tab flex flex-col items-center gap-1 w-full py-2 text-gray-500 hover:text-gray-300" data-target="view-settings">
             <i data-lucide="settings" class="w-6 h-6"></i>
@@ -163,6 +178,14 @@
         let lastWeatherData = null;
         let lastKpData = 0;
         let selectedDayIndex = 0;
+        const MAP_LAYERS = [
+            { id: 'wind', icon: 'wind', label: 'Wind' },
+            { id: 'gust', icon: 'wind', label: 'Gusts' },
+            { id: 'temperature', icon: 'thermometer', label: 'Temp' },
+            { id: 'precipitation', icon: 'umbrella', label: 'Rain' },
+            { id: 'clouds', icon: 'cloud', label: 'Clouds' },
+        ];
+        let activeMapLayer = 'wind';
 
         document.addEventListener('DOMContentLoaded', () => {
             lucide.createIcons();
@@ -172,7 +195,7 @@
             document.querySelectorAll('.nav-tab').forEach(btn => btn.addEventListener('click', (e) => {
                 document.querySelectorAll('.nav-tab').forEach(t => { t.classList.remove('text-breeze-accent'); t.classList.add('text-gray-500'); });
                 e.currentTarget.classList.remove('text-gray-500'); e.currentTarget.classList.add('text-breeze-accent');
-                ['view-forecast','view-settings'].forEach(id => document.getElementById(id).style.display = id === e.currentTarget.dataset.target ? 'block' : 'none');
+                ['view-forecast','view-map','view-settings'].forEach(id => document.getElementById(id).style.display = id === e.currentTarget.dataset.target ? 'block' : 'none');
             }));
 
             document.getElementById('btn-gps').addEventListener('click', requestGPS);
@@ -264,6 +287,7 @@
                 document.getElementById('location-label').innerText = name;
                 selectedDayIndex = 0;
                 renderDashboard();
+                renderMap();
             } catch(e) { document.getElementById('location-label').innerText = 'Error fetching data.'; }
         }
 
@@ -368,6 +392,31 @@
             }
             document.getElementById('hourly-matrix').innerHTML = `<thead>${rTime}</tr></thead><tbody>${rFly}</tr>${rWind}</tr>${rGust}</tr>${rDir}</tr>${rTemp}</tr>${rRain}</tr></tbody>`;
             lucide.createIcons();
+        }
+
+        function renderMapLayerBar() {
+            const bar = document.getElementById('map-layer-bar');
+            bar.innerHTML = MAP_LAYERS.map(l =>
+                `<button onclick="activeMapLayer='${l.id}';renderMap()"
+                    class="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition border
+                        ${activeMapLayer===l.id ? 'bg-breeze-accent text-white border-breeze-accent' : 'bg-breeze-surface text-gray-400 border-breeze-border hover:text-breeze-text'}">
+                    <i data-lucide="${l.icon}" class="w-3.5 h-3.5"></i> ${l.label}
+                </button>`
+            ).join('');
+            lucide.createIcons();
+        }
+
+        function renderMap() {
+            const ph = document.getElementById('map-placeholder');
+            if (!activeLocation) { ph.style.display = 'flex'; return; }
+            ph.style.display = 'none';
+            const { lat, lon } = activeLocation;
+            const zoom = 13;
+            const layer = activeMapLayer;
+            const w = layer === 'wind' || layer === 'gust' ? '&w=soft' : '';
+            document.getElementById('map-iframe').src =
+                `https://embed.ventusky.com/?p=${lat};${lon};${zoom}&l=${layer}${w}`;
+            renderMapLayerBar();
         }
     </script>
 </body>
