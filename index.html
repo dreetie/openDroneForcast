@@ -411,7 +411,7 @@
             if (!activeLocation) { ph.style.display = 'flex'; return; }
             ph.style.display = 'none';
             const { lat, lon } = activeLocation;
-            const zoom = 13;
+            const zoom = 12;
             const layer = activeMapLayer;
             const w = layer === 'wind' || layer === 'gust' ? '&w=soft' : '';
             document.getElementById('map-iframe').src =
